@@ -1,0 +1,44 @@
+# EAS Build ignores this file INSTEAD of .gitignore — must be self-contained.
+
+# --- Mirror .gitignore ---
+node_modules/
+.expo/
+dist/
+npm-debug.*
+*.jks
+*.p8
+*.p12
+*.key
+*.keystore
+*.mobileprovision
+*.orig.*
+web-build/
+.env
+.DS_Store
+.claude/settings.local.json
+
+# --- Additional EAS-only exclusions ---
+
+# Git history is huge and never needed by the build server.
+.git/
+.gitignore
+.gitattributes
+
+# Local-only Claude / editor / OS files.
+.claude/
+.vscode/
+.idea/
+
+# Project documentation isn't needed at build time.
+README.md
+**/*.md
+
+# Local asset-generation scripts (Node CLIs run on dev machine only).
+scripts/
+
+# Native build outputs (regenerated server-side).
+android/build/
+android/app/build/
+android/.gradle/
+ios/build/
+ios/Pods/
