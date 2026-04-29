@@ -1,4 +1,4 @@
-package com.chronos.history
+package com.historyhero.app
 
 import android.app.Application
 import android.content.res.Configuration
