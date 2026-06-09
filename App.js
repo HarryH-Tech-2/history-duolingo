@@ -5,7 +5,7 @@ import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import HomeScreen from './src/screens/HomeScreen';
@@ -15,43 +15,47 @@ import QuestsScreen from './src/screens/QuestsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
 import MusicPlayer from './src/components/MusicPlayer';
-import { colors, fonts } from './src/theme';
-import { UserProvider, useUser } from './src/state/UserContext';
+import { fonts } from './src/theme';
+import { UserProvider, useUser, useThemeColors } from './src/state/UserContext';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-const navTheme = {
-  ...DefaultTheme,
-  dark: true,
-  colors: {
-    ...DefaultTheme.colors,
-    background: colors.bg,
-    card: colors.bgDeep,
-    text: colors.textPrimary,
-    border: 'transparent',
-    primary: colors.gold,
-  },
-};
+function makeNavTheme(c, isDark) {
+  return {
+    ...DefaultTheme,
+    dark: isDark,
+    colors: {
+      ...DefaultTheme.colors,
+      background: c.bg,
+      card: c.bgDeep,
+      text: c.textPrimary,
+      border: 'transparent',
+      primary: c.gold,
+    },
+  };
+}
 
 function TabBarIcon({ name, focused }) {
+  const c = useThemeColors();
   return (
     <Ionicons
       name={name}
       size={22}
-      color={focused ? colors.gold : colors.textMuted}
+      color={focused ? c.gold : c.textMuted}
     />
   );
 }
 
 function TabLabel({ label, focused }) {
+  const c = useThemeColors();
   return (
     <Text
       style={{
         fontFamily: fonts.serifBold,
         fontSize: 11,
         letterSpacing: 0.5,
-        color: focused ? colors.gold : colors.textMuted,
+        color: focused ? c.gold : c.textMuted,
         marginTop: 2,
       }}
     >
@@ -61,18 +65,25 @@ function TabLabel({ label, focused }) {
 }
 
 function Tabs() {
+  // Lift the bar above the device's bottom safe-area (gesture pill / nav buttons).
+  // Fall back to a small inset on devices that report 0 so the labels still breathe.
+  const insets = useSafeAreaInsets();
+  const bottomInset = Math.max(insets.bottom, 8);
+  const c = useThemeColors();
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: colors.bgDeep,
+          backgroundColor: c.bgDeep,
           borderTopWidth: 1,
-          borderTopColor: colors.borderSubtle,
-          height: 80,
+          borderTopColor: c.borderSubtle,
+          height: 64 + bottomInset,
           paddingTop: 10,
-          paddingBottom: 16,
+          paddingBottom: bottomInset,
         },
+        tabBarActiveTintColor: c.gold,
+        tabBarInactiveTintColor: c.textMuted,
         tabBarLabelStyle: {
           fontFamily: fonts.serifBold,
           fontSize: 11,
@@ -117,11 +128,12 @@ function Tabs() {
 
 function RootNavigator() {
   const { hasOnboarded } = useUser();
+  const c = useThemeColors();
   return (
     <Stack.Navigator
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: colors.bg },
+        contentStyle: { backgroundColor: c.bg },
       }}
     >
       {!hasOnboarded && (
@@ -144,16 +156,26 @@ function RootNavigator() {
   );
 }
 
+function ThemedNavigation() {
+  const { settings, themeColors } = useUser();
+  const isLight = settings.theme === 'Parchment Light';
+  return (
+    <>
+      <StatusBar style={isLight ? 'dark' : 'light'} />
+      <NavigationContainer theme={makeNavTheme(themeColors, !isLight)}>
+        <RootNavigator />
+      </NavigationContainer>
+    </>
+  );
+}
+
 export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <UserProvider>
-          <StatusBar style="light" />
           <MusicPlayer />
-          <NavigationContainer theme={navTheme}>
-            <RootNavigator />
-          </NavigationContainer>
+          <ThemedNavigation />
         </UserProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

@@ -3,11 +3,11 @@
 import React, { createContext, useContext, useMemo, useState, useCallback } from 'react';
 import { REGIONS, CHARACTERS } from '../data/curriculum';
 import { AUDIO_TRACKS, NO_TRACK } from '../data/audioTracks';
+import { getColors, THEME_PALETTES } from '../theme';
 
 const UserContext = createContext(null);
 
-const LANGUAGES = ['English', 'Latin', 'Greek', 'Italian', 'Français'];
-const THEMES = ['Parchment Dark', 'Parchment Light', 'Imperial Purple'];
+const THEMES = Object.keys(THEME_PALETTES);
 
 export function UserProvider({ children }) {
   // Default avatar: Caesar (first character).
@@ -23,14 +23,19 @@ export function UserProvider({ children }) {
 
   // ---- Settings state ----
   const [settings, setSettings] = useState({
-    notifications: true,
     soundEffects: true,
     haptics: true,
     music: false,
     musicTrackId: NO_TRACK.id,
-    language: 'English',
     theme: 'Parchment Dark',
+    // Set once the user taps "Leave a review" so we don't pester them again.
+    hasReviewed: false,
   });
+
+  // Active theme palette derived from settings.theme. Consumers should call
+  // `useThemeColors()` instead of reaching for the static `colors` import
+  // when they want to react to theme changes.
+  const themeColors = useMemo(() => getColors(settings.theme), [settings.theme]);
 
   const updateSetting = useCallback((key, value) => {
     setSettings((s) => ({ ...s, [key]: value }));
@@ -168,11 +173,11 @@ export function UserProvider({ children }) {
       updateSetting,
       toggleSetting,
       cycleSetting,
-      languages: LANGUAGES,
       themes: THEMES,
+      themeColors,
       audioTracks: AUDIO_TRACKS,
     }),
-    [avatar, avatarId, stats, hasOnboarded, version, completeLesson, settings, updateSetting, toggleSetting, cycleSetting]
+    [avatar, avatarId, stats, hasOnboarded, version, completeLesson, settings, updateSetting, toggleSetting, cycleSetting, themeColors]
   );
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
@@ -182,4 +187,10 @@ export function useUser() {
   const ctx = useContext(UserContext);
   if (!ctx) throw new Error('useUser must be used inside UserProvider');
   return ctx;
+}
+
+// Convenience hook so screens can pull the active theme palette without
+// destructuring the rest of the user context.
+export function useThemeColors() {
+  return useUser().themeColors;
 }

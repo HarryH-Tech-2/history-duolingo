@@ -13,11 +13,19 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors, fonts, radii } from '../theme';
+import { fonts, radii } from '../theme';
 import { Flame, Gem, Heart } from '../components/Stats';
-import { useUser } from '../state/UserContext';
+import { useUser, useThemeColors } from '../state/UserContext';
 
 const { width: SCREEN_W } = Dimensions.get('window');
+
+// Hook used by every sub-component in this file so they all re-render when
+// the active theme changes.
+function useThemed() {
+  const c = useThemeColors();
+  const styles = useMemo(() => makeStyles(c), [c]);
+  return { c, styles };
+}
 
 export default function ProfileScreen() {
   const {
@@ -30,10 +38,10 @@ export default function ProfileScreen() {
     toggleSetting,
     cycleSetting,
     updateSetting,
-    languages,
     themes,
     audioTracks,
   } = useUser();
+  const { c, styles } = useThemed();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [musicPickerOpen, setMusicPickerOpen] = useState(false);
 
@@ -84,7 +92,7 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.root}>
-      <LinearGradient colors={['#0A1024', '#0B0F1C']} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={[c.gradient[0], c.bg]} style={StyleSheet.absoluteFill} />
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
         <ScrollView
           showsVerticalScrollIndicator={false}
@@ -104,7 +112,7 @@ export default function ProfileScreen() {
                 resizeMode="cover"
               />
               <View style={styles.avatarEditBadge}>
-                <Ionicons name="pencil" size={12} color="#0B0F1C" />
+                <Ionicons name="pencil" size={12} color={c.bg} />
               </View>
             </Pressable>
             <Text style={styles.name}>{avatar.name}</Text>
@@ -130,7 +138,7 @@ export default function ProfileScreen() {
                   <Text
                     style={[
                       styles.badgeName,
-                      !b.achieved && { color: colors.textLocked },
+                      !b.achieved && { color: c.textLocked },
                     ]}
                   >
                     {b.name}
@@ -138,7 +146,7 @@ export default function ProfileScreen() {
                   <Text
                     style={[
                       styles.badgeDesc,
-                      !b.achieved && { color: colors.textLocked },
+                      !b.achieved && { color: c.textLocked },
                     ]}
                     numberOfLines={2}
                   >
@@ -177,13 +185,6 @@ export default function ProfileScreen() {
                 value={avatar.name}
               />
               <SettingRow
-                icon="notifications"
-                tint="#D8546A"
-                label="Notifications"
-                value={settings.notifications ? 'On' : 'Off'}
-                onPress={() => toggleSetting('notifications')}
-              />
-              <SettingRow
                 icon="volume-high"
                 tint="#8A6BC7"
                 label="Sound effects"
@@ -211,13 +212,6 @@ export default function ProfileScreen() {
                 onPress={() => setMusicPickerOpen(true)}
               />
               <SettingRow
-                icon="language"
-                tint="#5FB37A"
-                label="Language"
-                value={settings.language}
-                onPress={() => cycleSetting('language', languages)}
-              />
-              <SettingRow
                 icon="moon"
                 tint="#6EA3D6"
                 label="Theme"
@@ -225,11 +219,6 @@ export default function ProfileScreen() {
                 onPress={() => cycleSetting('theme', themes)}
                 isLast
               />
-            </View>
-            <View style={[styles.settingsGroup, { marginTop: 10 }]}>
-              <SettingRow icon="help-circle" tint="#E89C5F" label="Help & support" />
-              <SettingRow icon="shield-checkmark" tint="#5FB37A" label="Privacy" />
-              <SettingRow icon="log-out" tint="#D8546A" label="Sign out" isLast />
             </View>
           </Section>
         </ScrollView>
@@ -264,19 +253,20 @@ export default function ProfileScreen() {
 }
 
 function MusicPicker({ open, onClose, tracks, musicEnabled, activeTrackId, onToggle, onPick }) {
+  const { c, styles } = useThemed();
   return (
     <Modal visible={open} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={styles.modalSheet}>
           <LinearGradient
-            colors={['#141B30', '#0B0F1C']}
+            colors={[c.bgElevated, c.bg]}
             style={StyleSheet.absoluteFill}
           />
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Background music</Text>
             <Pressable onPress={onClose} hitSlop={12}>
-              <Ionicons name="close" size={24} color={colors.textSecondary} />
+              <Ionicons name="close" size={24} color={c.textSecondary} />
             </Pressable>
           </View>
           <Text style={styles.modalSub}>
@@ -293,7 +283,7 @@ function MusicPicker({ open, onClose, tracks, musicEnabled, activeTrackId, onTog
             <Ionicons
               name={musicEnabled ? 'volume-high' : 'volume-mute'}
               size={18}
-              color={musicEnabled ? colors.gold : colors.textMuted}
+              color={musicEnabled ? c.gold : c.textMuted}
             />
             <Text style={styles.musicToggleLabel}>
               Music {musicEnabled ? 'enabled' : 'disabled'}
@@ -326,7 +316,7 @@ function MusicPicker({ open, onClose, tracks, musicEnabled, activeTrackId, onTog
             />
             {tracks.length === 0 ? (
               <View style={styles.emptyTracks}>
-                <Ionicons name="folder-open" size={28} color={colors.textMuted} />
+                <Ionicons name="folder-open" size={28} color={c.textMuted} />
                 <Text style={styles.emptyTracksTitle}>No tracks registered</Text>
                 <Text style={styles.emptyTracksDesc}>
                   See assets/audio/README.md for setup instructions.
@@ -351,6 +341,7 @@ function MusicPicker({ open, onClose, tracks, musicEnabled, activeTrackId, onTog
 }
 
 function TrackRow({ title, subtitle, active, onPress }) {
+  const { c, styles } = useThemed();
   return (
     <Pressable
       onPress={onPress}
@@ -363,10 +354,10 @@ function TrackRow({ title, subtitle, active, onPress }) {
       <Ionicons
         name={active ? 'radio-button-on' : 'radio-button-off'}
         size={20}
-        color={active ? colors.gold : colors.textMuted}
+        color={active ? c.gold : c.textMuted}
       />
       <View style={{ flex: 1 }}>
-        <Text style={[styles.trackTitle, active && { color: colors.gold }]}>
+        <Text style={[styles.trackTitle, active && { color: c.gold }]}>
           {title}
         </Text>
         {subtitle ? <Text style={styles.trackSubtitle}>{subtitle}</Text> : null}
@@ -376,19 +367,20 @@ function TrackRow({ title, subtitle, active, onPress }) {
 }
 
 function CharacterPicker({ open, onClose, characters, activeId, onPick }) {
+  const { c, styles } = useThemed();
   return (
     <Modal visible={open} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={styles.modalSheet}>
           <LinearGradient
-            colors={['#141B30', '#0B0F1C']}
+            colors={[c.bgElevated, c.bg]}
             style={StyleSheet.absoluteFill}
           />
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Choose your avatar</Text>
             <Pressable onPress={onClose} hitSlop={12}>
-              <Ionicons name="close" size={24} color={colors.textSecondary} />
+              <Ionicons name="close" size={24} color={c.textSecondary} />
             </Pressable>
           </View>
           <Text style={styles.modalSub}>
@@ -398,12 +390,12 @@ function CharacterPicker({ open, onClose, characters, activeId, onPick }) {
             contentContainerStyle={styles.pickerGrid}
             showsVerticalScrollIndicator={false}
           >
-            {characters.map((c) => {
-              const active = c.id === activeId;
+            {characters.map((ch) => {
+              const active = ch.id === activeId;
               return (
                 <Pressable
-                  key={c.id}
-                  onPress={() => onPick(c.id)}
+                  key={ch.id}
+                  onPress={() => onPick(ch.id)}
                   style={({ pressed }) => [
                     styles.pickerCard,
                     active && styles.pickerCardActive,
@@ -412,27 +404,27 @@ function CharacterPicker({ open, onClose, characters, activeId, onPick }) {
                 >
                   <View style={styles.pickerPortrait}>
                     <Image
-                      source={c.image}
+                      source={ch.image}
                       style={{ width: '100%', height: '100%' }}
                       resizeMode="cover"
                     />
                     {active && (
                       <View style={styles.pickerCheck}>
-                        <Ionicons name="checkmark" size={14} color="#0B0F1C" />
+                        <Ionicons name="checkmark" size={14} color={c.bg} />
                       </View>
                     )}
                   </View>
                   <Text
                     style={[
                       styles.pickerName,
-                      active && { color: colors.gold },
+                      active && { color: c.gold },
                     ]}
                     numberOfLines={1}
                   >
-                    {c.name}
+                    {ch.name}
                   </Text>
                   <Text style={styles.pickerEra} numberOfLines={1}>
-                    {c.era}
+                    {ch.era}
                   </Text>
                 </Pressable>
               );
@@ -445,6 +437,7 @@ function CharacterPicker({ open, onClose, characters, activeId, onPick }) {
 }
 
 function StatCard({ icon, value, label }) {
+  const { styles } = useThemed();
   return (
     <View style={styles.statCard}>
       {icon}
@@ -455,6 +448,7 @@ function StatCard({ icon, value, label }) {
 }
 
 function Section({ title, children }) {
+  const { styles } = useThemed();
   return (
     <View style={{ marginTop: 28, paddingHorizontal: 16 }}>
       <Text style={styles.sectionTitle}>{title}</Text>
@@ -464,6 +458,7 @@ function Section({ title, children }) {
 }
 
 function Row({ label, value }) {
+  const { styles } = useThemed();
   return (
     <View style={styles.row}>
       <Text style={styles.rowLabel}>{label}</Text>
@@ -472,7 +467,9 @@ function Row({ label, value }) {
   );
 }
 
-function SettingRow({ icon, label, value, onPress, tint = colors.gold, isLast }) {
+function SettingRow({ icon, label, value, onPress, tint, isLast }) {
+  const { c, styles } = useThemed();
+  const iconTint = tint || c.gold;
   // Always use Pressable so the function-style works whether or not the row
   // has an onPress handler. Using `<View style={fn}>` silently drops styles.
   return (
@@ -484,8 +481,8 @@ function SettingRow({ icon, label, value, onPress, tint = colors.gold, isLast })
         pressed && onPress && { opacity: 0.7 },
       ]}
     >
-      <View style={[styles.settingIconChip, { backgroundColor: tint + '22', borderColor: tint + '55' }]}>
-        <Ionicons name={icon} size={16} color={tint} />
+      <View style={[styles.settingIconChip, { backgroundColor: iconTint + '22', borderColor: iconTint + '55' }]}>
+        <Ionicons name={icon} size={16} color={iconTint} />
       </View>
       <Text style={styles.settingLabel} numberOfLines={1}>{label}</Text>
       <View style={styles.settingValueWrap}>
@@ -494,14 +491,14 @@ function SettingRow({ icon, label, value, onPress, tint = colors.gold, isLast })
             {value}
           </Text>
         ) : null}
-        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+        <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
       </View>
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
+const makeStyles = (c) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: c.bg },
   topHero: { alignItems: 'center', paddingTop: 20, paddingBottom: 12 },
   avatarLarge: {
     width: 140,
@@ -509,7 +506,7 @@ const styles = StyleSheet.create({
     borderRadius: 70,
     overflow: 'hidden',
     borderWidth: 3,
-    borderColor: colors.gold,
+    borderColor: c.gold,
   },
   avatarEditBadge: {
     position: 'absolute',
@@ -518,22 +515,22 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: colors.gold,
+    backgroundColor: c.gold,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#0B0F1C',
+    borderColor: c.bg,
   },
   name: {
     fontFamily: fonts.heading,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 28,
     marginTop: 12,
     letterSpacing: -0.5,
   },
   handle: {
     fontFamily: fonts.serifItalic,
-    color: colors.gold,
+    color: c.gold,
     fontSize: 14,
     marginTop: 2,
   },
@@ -546,27 +543,27 @@ const styles = StyleSheet.create({
   statCard: {
     flex: 1,
     alignItems: 'center',
-    backgroundColor: colors.bgCard,
+    backgroundColor: c.bgCard,
     borderWidth: 1,
-    borderColor: colors.borderSubtle,
+    borderColor: c.borderSubtle,
     borderRadius: radii.md,
     paddingVertical: 14,
     gap: 4,
   },
   statVal: {
     fontFamily: fonts.heading,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 22,
   },
   statLbl: {
     fontFamily: fonts.serif,
-    color: colors.textMuted,
+    color: c.textMuted,
     fontSize: 11,
     letterSpacing: 1,
   },
   sectionTitle: {
     fontFamily: fonts.serifBold,
-    color: colors.gold,
+    color: c.gold,
     fontSize: 12,
     letterSpacing: 2.5,
     marginBottom: 10,
@@ -575,25 +572,25 @@ const styles = StyleSheet.create({
   badge: {
     width: '31.5%',
     aspectRatio: 0.95,
-    backgroundColor: colors.bgCard,
+    backgroundColor: c.bgCard,
     borderWidth: 1,
-    borderColor: colors.borderSubtle,
+    borderColor: c.borderSubtle,
     borderRadius: radii.md,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 8,
   },
-  badgeLocked: { backgroundColor: 'rgba(245, 232, 208, 0.02)', borderStyle: 'dashed' },
+  badgeLocked: { backgroundColor: c.bgGlass, borderStyle: 'dashed' },
   badgeEmoji: { fontSize: 32, marginBottom: 4 },
   badgeName: {
     fontFamily: fonts.serifBold,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 12,
     textAlign: 'center',
   },
   badgeDesc: {
     fontFamily: fonts.serif,
-    color: colors.textMuted,
+    color: c.textMuted,
     fontSize: 10,
     textAlign: 'center',
     marginTop: 2,
@@ -603,14 +600,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderSubtle,
+    borderBottomColor: c.borderSubtle,
   },
-  rowLabel: { fontFamily: fonts.serif, color: colors.textSecondary, fontSize: 14 },
-  rowValue: { fontFamily: fonts.serifBold, color: colors.gold, fontSize: 14 },
+  rowLabel: { fontFamily: fonts.serif, color: c.textSecondary, fontSize: 14 },
+  rowValue: { fontFamily: fonts.serifBold, color: c.gold, fontSize: 14 },
   settingsGroup: {
-    backgroundColor: colors.bgCard,
+    backgroundColor: c.bgCard,
     borderWidth: 1,
-    borderColor: colors.borderSubtle,
+    borderColor: c.borderSubtle,
     borderRadius: radii.md,
     paddingHorizontal: 14,
     overflow: 'hidden',
@@ -621,7 +618,7 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderSubtle,
+    borderBottomColor: c.borderSubtle,
   },
   settingIconChip: {
     width: 32,
@@ -634,7 +631,7 @@ const styles = StyleSheet.create({
   settingLabel: {
     flex: 1,
     fontFamily: fonts.serif,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 15,
   },
   settingValueWrap: {
@@ -645,7 +642,7 @@ const styles = StyleSheet.create({
   },
   settingValue: {
     fontFamily: fonts.serifBold,
-    color: colors.gold,
+    color: c.gold,
     fontSize: 13,
     letterSpacing: 0.2,
     textAlign: 'right',
@@ -653,7 +650,7 @@ const styles = StyleSheet.create({
 
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(6, 9, 19, 0.8)',
+    backgroundColor: c.overlay,
     justifyContent: 'flex-end',
   },
   modalSheet: {
@@ -662,7 +659,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     overflow: 'hidden',
     borderTopWidth: 1,
-    borderColor: colors.borderSubtle,
+    borderColor: c.borderSubtle,
     paddingTop: 16,
     paddingHorizontal: 16,
   },
@@ -673,12 +670,12 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontFamily: fonts.heading,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 22,
   },
   modalSub: {
     fontFamily: fonts.serifItalic,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     fontSize: 13,
     marginTop: 2,
     marginBottom: 12,
@@ -692,23 +689,23 @@ const styles = StyleSheet.create({
   },
   pickerCard: {
     width: (SCREEN_W - 32 - 20) / 3,
-    backgroundColor: colors.bgCard,
+    backgroundColor: c.bgCard,
     borderRadius: radii.md,
     borderWidth: 1,
-    borderColor: colors.borderSubtle,
+    borderColor: c.borderSubtle,
     padding: 8,
     alignItems: 'center',
   },
   pickerCardActive: {
-    borderColor: colors.gold,
-    backgroundColor: 'rgba(232, 201, 116, 0.12)',
+    borderColor: c.gold,
+    backgroundColor: c.goldSoft,
   },
   pickerPortrait: {
     width: '100%',
     aspectRatio: 1,
     borderRadius: radii.sm,
     overflow: 'hidden',
-    backgroundColor: '#0B0F1C',
+    backgroundColor: c.bgDeep,
   },
   pickerCheck: {
     position: 'absolute',
@@ -717,22 +714,22 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: colors.gold,
+    backgroundColor: c.gold,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#0B0F1C',
+    borderColor: c.bg,
   },
   pickerName: {
     fontFamily: fonts.serifBold,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 11,
     marginTop: 6,
     textAlign: 'center',
   },
   pickerEra: {
     fontFamily: fonts.serifItalic,
-    color: colors.textMuted,
+    color: c.textMuted,
     fontSize: 9,
     marginTop: 1,
     textAlign: 'center',
@@ -743,34 +740,34 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 14,
     paddingHorizontal: 14,
-    backgroundColor: colors.bgCard,
+    backgroundColor: c.bgCard,
     borderWidth: 1,
-    borderColor: colors.borderSubtle,
+    borderColor: c.borderSubtle,
     borderRadius: radii.md,
     marginTop: 4,
   },
   musicToggleLabel: {
     flex: 1,
     fontFamily: fonts.serifBold,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 14,
   },
   toggleSwitch: {
     width: 40,
     height: 22,
     borderRadius: 11,
-    backgroundColor: 'rgba(245, 232, 208, 0.12)',
+    backgroundColor: c.borderSubtle,
     justifyContent: 'center',
     paddingHorizontal: 2,
   },
   toggleSwitchOn: {
-    backgroundColor: colors.gold,
+    backgroundColor: c.gold,
   },
   toggleKnob: {
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: '#0B0F1C',
+    backgroundColor: c.bg,
   },
   toggleKnobOn: {
     transform: [{ translateX: 18 }],
@@ -782,19 +779,19 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 12,
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderSubtle,
+    borderBottomColor: c.borderSubtle,
   },
   trackRowActive: {
-    backgroundColor: 'rgba(232, 201, 116, 0.08)',
+    backgroundColor: c.goldSoft,
   },
   trackTitle: {
     fontFamily: fonts.serifBold,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 15,
   },
   trackSubtitle: {
     fontFamily: fonts.serif,
-    color: colors.textMuted,
+    color: c.textMuted,
     fontSize: 11,
     marginTop: 1,
   },
@@ -806,13 +803,13 @@ const styles = StyleSheet.create({
   },
   emptyTracksTitle: {
     fontFamily: fonts.serifBold,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     fontSize: 14,
     marginTop: 6,
   },
   emptyTracksDesc: {
     fontFamily: fonts.serifItalic,
-    color: colors.textMuted,
+    color: c.textMuted,
     fontSize: 12,
     textAlign: 'center',
   },

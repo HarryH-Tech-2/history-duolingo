@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -25,34 +25,30 @@ import Reanimated, {
 } from 'react-native-reanimated';
 import Svg, { Path as SvgPath, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 
-import { colors, fonts, radii, shadows } from '../theme';
+import { fonts, radii, shadows } from '../theme';
 import { MODULES, REGIONS } from '../data/curriculum';
 import { Check, Lock } from './LessonIcon';
-import { useUser } from '../state/UserContext';
+import { useUser, useThemeColors } from '../state/UserContext';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
-// Native source resolution of the painted maps (Gemini returns 1024×1024).
-// We render the Image at this logical size inside the gesture-scaled view
-// so that zooming reveals real native pixels instead of upscaling a
-// screen-sized bitmap.
 const NATIVE_W = 1024;
 const NATIVE_H = 1024;
-// Frame viewport width (what the user actually sees).
 const FRAME_W = SCREEN_W;
 const FRAME_H = SCREEN_W;
-// Base (fit-to-frame) scale — 1024 → screen width.
 const FIT_SCALE = FRAME_W / NATIVE_W;
 const MIN_SCALE = FIT_SCALE;
-// Cap zoom at 1:1 with the source bitmap (scale = 1) so the painted map
-// stays crisp instead of upscaling beyond its native resolution. We aim
-// for ~6x the fit scale, but never beyond native pixels.
 const MAX_SCALE = Math.min(FIT_SCALE * 6, 1);
 
+function useThemed() {
+  const c = useThemeColors();
+  const styles = useMemo(() => makeStyles(c), [c]);
+  return { c, styles };
+}
+
 export default function WorldMap({ onSelect, onZoomChange }) {
-  // Subscribing to the user context here makes this component re-render
-  // when lesson statuses mutate (active / locked / completed) elsewhere.
   useUser();
+  const { c, styles } = useThemed();
   const [activeIdx, setActiveIdx] = useState(0);
   const region = REGIONS[activeIdx];
   const fade = useRef(new Animated.Value(1)).current;
@@ -91,7 +87,6 @@ export default function WorldMap({ onSelect, onZoomChange }) {
   const pulseScale = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.45] });
   const pulseOpacity = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0] });
 
-  // Find which module this region belongs to (for tab grouping).
   const regionModule = MODULES.find((m) => m.regions.some((r) => r.id === region.id));
 
   return (
@@ -129,7 +124,7 @@ export default function WorldMap({ onSelect, onZoomChange }) {
                         <Ionicons
                           name="lock-closed"
                           size={10}
-                          color={colors.textMuted}
+                          color={c.textMuted}
                           style={{ marginRight: 4 }}
                         />
                       )}
@@ -137,7 +132,7 @@ export default function WorldMap({ onSelect, onZoomChange }) {
                         style={[
                           styles.tabName,
                           isActive && { color: m.accent },
-                          locked && !isActive && { color: colors.textLocked },
+                          locked && !isActive && { color: c.textLocked },
                         ]}
                         numberOfLines={1}
                       >
@@ -147,8 +142,8 @@ export default function WorldMap({ onSelect, onZoomChange }) {
                     <Text
                       style={[
                         styles.tabEra,
-                        isActive && { color: colors.textSecondary },
-                        locked && !isActive && { color: colors.textLocked },
+                        isActive && { color: c.textSecondary },
+                        locked && !isActive && { color: c.textLocked },
                       ]}
                       numberOfLines={1}
                     >
@@ -165,7 +160,7 @@ export default function WorldMap({ onSelect, onZoomChange }) {
       {/* Region header */}
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.eyebrow, { color: regionModule?.accent || colors.gold }]}>
+          <Text style={[styles.eyebrow, { color: regionModule?.accent || c.gold }]}>
             {regionModule?.title.toUpperCase() || 'REGION'}
           </Text>
           <Text style={styles.title}>{region.subtitle}</Text>
@@ -192,7 +187,7 @@ export default function WorldMap({ onSelect, onZoomChange }) {
 
       {/* Hint */}
       <View style={styles.hintRow}>
-        <Ionicons name="scan-outline" size={12} color={colors.textMuted} />
+        <Ionicons name="scan-outline" size={12} color={c.textMuted} />
         <Text style={styles.hintText}>Pinch to zoom · drag to pan</Text>
       </View>
 
@@ -212,7 +207,7 @@ export default function WorldMap({ onSelect, onZoomChange }) {
                 styles.stripDot,
                 {
                   backgroundColor:
-                    lesson.status === 'locked' ? 'rgba(30, 35, 50, 0.85)' : lesson.color,
+                    lesson.status === 'locked' ? c.bgCardSolid : lesson.color,
                 },
               ]}
             >
@@ -221,13 +216,13 @@ export default function WorldMap({ onSelect, onZoomChange }) {
               ) : lesson.status === 'active' ? (
                 <Text style={styles.stripNum}>{i + 1}</Text>
               ) : (
-                <Ionicons name="lock-closed" size={12} color={colors.textMuted} />
+                <Ionicons name="lock-closed" size={12} color={c.textMuted} />
               )}
             </View>
             <Text
               style={[
                 styles.stripTitle,
-                lesson.status === 'locked' && { color: colors.textLocked },
+                lesson.status === 'locked' && { color: c.textLocked },
               ]}
               numberOfLines={1}
             >
@@ -239,7 +234,7 @@ export default function WorldMap({ onSelect, onZoomChange }) {
 
       {allDone && activeIdx < REGIONS.length - 1 && (
         <View style={styles.unlock}>
-          <Ionicons name="star" size={18} color={colors.gold} />
+          <Ionicons name="star" size={18} color={c.gold} />
           <Text style={styles.unlockText}>
             Region mastered — {REGIONS[activeIdx + 1].name} unlocked
           </Text>
@@ -251,7 +246,7 @@ export default function WorldMap({ onSelect, onZoomChange }) {
             ]}
           >
             <Text style={styles.unlockBtnText}>CONTINUE</Text>
-            <Ionicons name="chevron-forward" size={14} color="#0B0F1C" />
+            <Ionicons name="chevron-forward" size={14} color={c.bg} />
           </Pressable>
         </View>
       )}
@@ -260,21 +255,16 @@ export default function WorldMap({ onSelect, onZoomChange }) {
 }
 
 function ZoomableMap({ region, pulseScale, pulseOpacity, onSelect, onZoomChange }) {
-  // Notify parent so it can disable its outer ScrollView while the user is
-  // panning the zoomed map. Otherwise the parent intercepts vertical drags.
+  const { styles } = useThemed();
   const notifyZoom = (zoomed) => {
     if (onZoomChange) onZoomChange(zoomed);
   };
-  // Reanimated shared values for pan + pinch. Start at fit-to-frame scale
-  // so the full 1024px image fills the screen-width viewport.
   const scale = useSharedValue(FIT_SCALE);
   const savedScale = useSharedValue(FIT_SCALE);
   const tx = useSharedValue(0);
   const ty = useSharedValue(0);
   const savedTx = useSharedValue(0);
   const savedTy = useSharedValue(0);
-  // Track pinch focal point (in gesture-local coords) so zoom anchors on
-  // the user's fingers instead of the image center.
   const pinchFocalX = useSharedValue(0);
   const pinchFocalY = useSharedValue(0);
 
@@ -283,7 +273,6 @@ function ZoomableMap({ region, pulseScale, pulseOpacity, onSelect, onZoomChange 
     return Math.max(-limit, Math.min(limit, val));
   };
 
-  // At a given scale, how far off-center can we pan before an edge shows?
   const maxPanFor = (s) => {
     'worklet';
     const rendered = NATIVE_W * s;
@@ -292,24 +281,18 @@ function ZoomableMap({ region, pulseScale, pulseOpacity, onSelect, onZoomChange 
 
   const pinch = Gesture.Pinch()
     .onStart((e) => {
-      // The pinch focal point is reported in the gesture handler's local
-      // (un-transformed) coordinate space. Convert to a delta from the
-      // frame center so we can anchor zoom on the fingers.
       pinchFocalX.value = e.focalX - FRAME_W / 2;
       pinchFocalY.value = e.focalY - FRAME_H / 2;
     })
     .onUpdate((e) => {
       const next = Math.max(MIN_SCALE, Math.min(MAX_SCALE, savedScale.value * e.scale));
       const ratio = next / savedScale.value;
-      // Translate so the focal point stays under the user's fingers as
-      // the image scales: new = focal + ratio * (saved - focal).
       const newTx = pinchFocalX.value + ratio * (savedTx.value - pinchFocalX.value);
       const newTy = pinchFocalY.value + ratio * (savedTy.value - pinchFocalY.value);
       const lim = maxPanFor(next);
       scale.value = next;
       tx.value = clamp(newTx, lim);
       ty.value = clamp(newTy, lim);
-      // Tell parent we're zoomed so it can disable outer scrolling.
       if (next > MIN_SCALE + 0.001) runOnJS(notifyZoom)(true);
     })
     .onEnd(() => {
@@ -333,9 +316,6 @@ function ZoomableMap({ region, pulseScale, pulseOpacity, onSelect, onZoomChange 
       }
     });
 
-  // Pan uses manual activation: it only claims the touch when the map is
-  // zoomed past the fit scale. At fit, vertical drags fall through to the
-  // parent ScrollView so the page can scroll as expected.
   const pan = Gesture.Pan()
     .minPointers(1)
     .maxPointers(1)
@@ -358,8 +338,6 @@ function ZoomableMap({ region, pulseScale, pulseOpacity, onSelect, onZoomChange 
       savedTy.value = ty.value;
     });
 
-  // Double-tap zooms toward the tap location (or zooms back out if already
-  // zoomed in).
   const doubleTap = Gesture.Tap()
     .numberOfTaps(2)
     .maxDuration(280)
@@ -390,12 +368,8 @@ function ZoomableMap({ region, pulseScale, pulseOpacity, onSelect, onZoomChange 
       }
     });
 
-  // Pinch and pan can run simultaneously; double-tap wins over pan when
-  // the user is tapping rather than dragging.
   const composed = Gesture.Simultaneous(pinch, Gesture.Exclusive(doubleTap, pan));
 
-  // Transform origin is the center of the NATIVE_W square, so translation
-  // is applied in screen space (not scaled space).
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [
       { translateX: tx.value },
@@ -448,61 +422,83 @@ function ZoomableMap({ region, pulseScale, pulseOpacity, onSelect, onZoomChange 
   );
 }
 
-// Draws a smooth dashed "route" connecting the lesson hotspots in order so
-// the player can see which quiz comes next. Rendered inside the native-sized
-// 1024×1024 map so it pans & zooms with the image.
+// Builds a smooth centripetal-Catmull-Rom spline (converted to cubic Béziers).
+// Two things make this *guaranteed* smooth:
+//   1) Endpoints are extrapolated (p0 = 2*p1 - p2, pN+1 = 2*pN - pN-1) instead
+//      of clamped, so the first and last segments curve naturally rather than
+//      leaving a tangent kink at the start/end pin.
+//   2) Control handles use a normalized tangent length, so points that are
+//      close together don't get over-shot bezier handles (which is what causes
+//      the "loopy" wobble in vanilla Catmull-Rom near clustered lessons).
+function buildSmoothPath(pts) {
+  if (pts.length < 2) return '';
+  if (pts.length === 2) {
+    // Even with 2 points, render as a curve-friendly cubic with mirrored
+    // handles so the stroked line meets the stroke-caps cleanly.
+    const a = pts[0];
+    const b = pts[1];
+    const mx = (a.x + b.x) / 2;
+    const my = (a.y + b.y) / 2;
+    return `M ${a.x} ${a.y} C ${mx} ${my}, ${mx} ${my}, ${b.x} ${b.y}`;
+  }
+
+  const extended = [
+    // Extrapolate a phantom point before the first so the start tangent has
+    // proper direction instead of zero.
+    { x: 2 * pts[0].x - pts[1].x, y: 2 * pts[0].y - pts[1].y },
+    ...pts,
+    // Same trick at the end.
+    {
+      x: 2 * pts[pts.length - 1].x - pts[pts.length - 2].x,
+      y: 2 * pts[pts.length - 1].y - pts[pts.length - 2].y,
+    },
+  ];
+
+  // Tension dialed back from 0.5 → 0.4 so the curve stays smooth without
+  // overshooting between tightly-spaced points.
+  const t = 0.4;
+
+  let d = `M ${pts[0].x} ${pts[0].y}`;
+  for (let i = 1; i < extended.length - 2; i++) {
+    const p0 = extended[i - 1];
+    const p1 = extended[i];
+    const p2 = extended[i + 1];
+    const p3 = extended[i + 2];
+    const c1x = p1.x + (p2.x - p0.x) * t * (1 / 3);
+    const c1y = p1.y + (p2.y - p0.y) * t * (1 / 3);
+    const c2x = p2.x - (p3.x - p1.x) * t * (1 / 3);
+    const c2y = p2.y - (p3.y - p1.y) * t * (1 / 3);
+    d += ` C ${c1x.toFixed(2)} ${c1y.toFixed(2)}, ${c2x.toFixed(2)} ${c2y.toFixed(2)}, ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`;
+  }
+  return d;
+}
+
 function LessonPath({ lessons }) {
   if (!lessons || lessons.length < 2) return null;
 
   const pts = lessons.map((l) => ({
     x: l.x * NATIVE_W,
     y: l.y * NATIVE_H,
-    status: l.status,
   }));
 
-  // Build a smooth cardinal-like path using quadratic bezier midpoints
-  // so the line arcs gently between pins instead of zig-zagging.
-  let d = `M ${pts[0].x} ${pts[0].y}`;
-  for (let i = 1; i < pts.length; i++) {
-    const prev = pts[i - 1];
-    const cur = pts[i];
-    const mx = (prev.x + cur.x) / 2;
-    const my = (prev.y + cur.y) / 2;
-    // Offset control point perpendicular to the segment for a subtle arc.
-    const dx = cur.x - prev.x;
-    const dy = cur.y - prev.y;
-    const len = Math.max(1, Math.sqrt(dx * dx + dy * dy));
-    const bend = Math.min(len * 0.18, 80);
-    const cx = mx + (-dy / len) * bend;
-    const cy = my + (dx / len) * bend;
-    d += ` Q ${cx} ${cy} ${cur.x} ${cur.y}`;
-  }
+  const d = buildSmoothPath(pts);
 
-  // Find the furthest completed index so we can draw the "traveled" part
-  // solid and the rest dashed.
   let lastDone = -1;
   lessons.forEach((l, i) => {
     if (l.status === 'completed') lastDone = i;
   });
 
-  // Solid path through completed pins
-  let solidD = '';
-  if (lastDone > 0) {
-    solidD = `M ${pts[0].x} ${pts[0].y}`;
-    for (let i = 1; i <= lastDone; i++) {
-      const prev = pts[i - 1];
-      const cur = pts[i];
-      const mx = (prev.x + cur.x) / 2;
-      const my = (prev.y + cur.y) / 2;
-      const dx = cur.x - prev.x;
-      const dy = cur.y - prev.y;
-      const len = Math.max(1, Math.sqrt(dx * dx + dy * dy));
-      const bend = Math.min(len * 0.18, 80);
-      const cx = mx + (-dy / len) * bend;
-      const cy = my + (dx / len) * bend;
-      solidD += ` Q ${cx} ${cy} ${cur.x} ${cur.y}`;
-    }
-  }
+  const solidD = lastDone > 0 ? buildSmoothPath(pts.slice(0, lastDone + 1)) : '';
+
+  // Constellation glow: stack progressively narrower & brighter strokes on top
+  // of one another to approximate a gaussian blur (react-native-svg can't run
+  // filter primitives on Android, so stacking is the portable solution).
+  const glowLayers = [
+    { width: 38, opacity: 0.06 },
+    { width: 28, opacity: 0.10 },
+    { width: 20, opacity: 0.16 },
+    { width: 12, opacity: 0.26 },
+  ];
 
   return (
     <Svg
@@ -514,46 +510,86 @@ function LessonPath({ lessons }) {
     >
       <Defs>
         <SvgLinearGradient id="pathGold" x1="0" y1="0" x2="1" y2="1">
-          <Stop offset="0" stopColor="#F5D98A" stopOpacity="0.95" />
-          <Stop offset="1" stopColor="#B88F3E" stopOpacity="0.95" />
+          <Stop offset="0" stopColor="#FFE9B0" stopOpacity="1" />
+          <Stop offset="0.5" stopColor="#F5D98A" stopOpacity="1" />
+          <Stop offset="1" stopColor="#E8B85C" stopOpacity="1" />
+        </SvgLinearGradient>
+        <SvgLinearGradient id="pathGoldBright" x1="0" y1="0" x2="1" y2="0">
+          <Stop offset="0" stopColor="#FFF4D6" stopOpacity="1" />
+          <Stop offset="1" stopColor="#FFE9B0" stopOpacity="1" />
         </SvgLinearGradient>
       </Defs>
-      {/* Shadow underlay for legibility on bright map areas */}
-      <SvgPath
-        d={d}
-        stroke="rgba(11, 15, 28, 0.55)"
-        strokeWidth={16}
-        fill="none"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      {/* Upcoming/locked portion — dashed */}
-      <SvgPath
-        d={d}
-        stroke="url(#pathGold)"
-        strokeWidth={6}
-        fill="none"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeDasharray="14, 18"
-        opacity={0.85}
-      />
-      {/* Traveled portion — solid, drawn on top */}
-      {solidD !== '' && (
+
+      {/* Stacked gold glow halo — the constellation aura. Strokes share the
+          same `d` so they overlap perfectly and read as one soft glow. */}
+      {glowLayers.map((g, idx) => (
         <SvgPath
-          d={solidD}
-          stroke="url(#pathGold)"
-          strokeWidth={8}
+          key={`glow-${idx}`}
+          d={d}
+          stroke="#F5D98A"
+          strokeOpacity={g.opacity}
+          strokeWidth={g.width}
           fill="none"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
+      ))}
+
+      {/* Thin gold "starline" core for the full route (dimmer where un-traveled) */}
+      <SvgPath
+        d={d}
+        stroke="url(#pathGold)"
+        strokeWidth={3}
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity={0.55}
+      />
+
+      {/* Completed segment: brighter outer glow + bright white-hot core. */}
+      {solidD !== '' && (
+        <>
+          {[
+            { width: 32, opacity: 0.14 },
+            { width: 22, opacity: 0.22 },
+            { width: 14, opacity: 0.32 },
+          ].map((g, idx) => (
+            <SvgPath
+              key={`done-glow-${idx}`}
+              d={solidD}
+              stroke="#FFE9B0"
+              strokeOpacity={g.opacity}
+              strokeWidth={g.width}
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          ))}
+          <SvgPath
+            d={solidD}
+            stroke="url(#pathGold)"
+            strokeWidth={5}
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <SvgPath
+            d={solidD}
+            stroke="url(#pathGoldBright)"
+            strokeWidth={1.5}
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity={0.9}
+          />
+        </>
       )}
     </Svg>
   );
 }
 
 function Hotspot({ lesson, number, pulseScale, pulseOpacity, onPress }) {
+  const { styles } = useThemed();
   const disabled = lesson.status === 'locked';
   const isActive = lesson.status === 'active';
   const isDone = lesson.status === 'completed';
@@ -606,19 +642,13 @@ function Hotspot({ lesson, number, pulseScale, pulseOpacity, onPress }) {
           </View>
         )}
       </Pressable>
-
-      <View style={[styles.label, disabled && { opacity: 0.55 }]}>
-        <Text style={styles.labelName} numberOfLines={1}>
-          {lesson.hotspot}
-        </Text>
-      </View>
     </View>
   );
 }
 
-const PIN_SIZE = 54;
+const PIN_SIZE = 96;
 
-const styles = StyleSheet.create({
+const makeStyles = (c) => StyleSheet.create({
   wrap: { marginTop: 12 },
   tabs: { marginBottom: 12 },
   tabsContent: {
@@ -645,8 +675,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: radii.sm,
     borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    backgroundColor: 'rgba(11, 15, 28, 0.55)',
+    borderColor: c.borderSubtle,
+    backgroundColor: c.bgCard,
     position: 'relative',
   },
   tabLocked: {
@@ -658,14 +688,14 @@ const styles = StyleSheet.create({
   },
   tabName: {
     fontFamily: fonts.heading,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     fontSize: 14,
     lineHeight: 17,
     flexShrink: 1,
   },
   tabEra: {
     fontFamily: fonts.serif,
-    color: colors.textMuted,
+    color: c.textMuted,
     fontSize: 10,
     marginTop: 1,
     letterSpacing: 0.4,
@@ -684,7 +714,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: fonts.heading,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 22,
     lineHeight: 26,
     marginTop: 2,
@@ -694,13 +724,13 @@ const styles = StyleSheet.create({
   },
   progressNum: {
     fontFamily: fonts.heading,
-    color: colors.gold,
+    color: c.gold,
     fontSize: 20,
     lineHeight: 22,
   },
   progressLbl: {
     fontFamily: fonts.serif,
-    color: colors.textMuted,
+    color: c.textMuted,
     fontSize: 10,
     letterSpacing: 1.5,
   },
@@ -726,7 +756,7 @@ const styles = StyleSheet.create({
   },
   hintText: {
     fontFamily: fonts.serifItalic,
-    color: colors.textMuted,
+    color: c.textMuted,
     fontSize: 11,
     letterSpacing: 0.5,
   },
@@ -744,13 +774,13 @@ const styles = StyleSheet.create({
     borderRadius: PIN_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2.5,
+    borderWidth: 3,
     overflow: 'hidden',
   },
   pinIcon: {
-    width: PIN_SIZE - 6,
-    height: PIN_SIZE - 6,
-    borderRadius: (PIN_SIZE - 6) / 2,
+    width: PIN_SIZE - 8,
+    height: PIN_SIZE - 8,
+    borderRadius: (PIN_SIZE - 8) / 2,
   },
   pulseRing: {
     position: 'absolute',
@@ -763,52 +793,33 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: -2,
     right: -2,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: '#3E8256',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
+    borderWidth: 2.5,
     borderColor: '#0B0F1C',
   },
   numberBadge: {
     position: 'absolute',
     top: -4,
     right: -4,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    paddingHorizontal: 4,
+    minWidth: 24,
+    height: 24,
+    borderRadius: 12,
+    paddingHorizontal: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
+    borderWidth: 2.5,
     borderColor: '#0B0F1C',
   },
   numberText: {
     fontFamily: fonts.serifBold,
     color: '#0B0F1C',
-    fontSize: 10,
+    fontSize: 13,
   },
-  label: {
-    position: 'absolute',
-    top: PIN_SIZE + 2,
-    alignItems: 'center',
-    backgroundColor: 'rgba(11, 15, 28, 0.92)',
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: radii.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    minWidth: 54,
-  },
-  labelName: {
-    fontFamily: fonts.serifBold,
-    color: colors.textPrimary,
-    fontSize: 9,
-    letterSpacing: 0.2,
-  },
-
   lessonStrip: {
     flexDirection: 'row',
     paddingHorizontal: 16,
@@ -830,7 +841,7 @@ const styles = StyleSheet.create({
   },
   stripTitle: {
     fontFamily: fonts.serif,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     fontSize: 10,
     textAlign: 'center',
     lineHeight: 13,
@@ -841,9 +852,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     padding: 14,
     borderRadius: radii.md,
-    backgroundColor: 'rgba(232, 201, 116, 0.1)',
+    backgroundColor: c.goldSoft,
     borderWidth: 1.5,
-    borderColor: colors.gold,
+    borderColor: c.gold,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
@@ -851,14 +862,14 @@ const styles = StyleSheet.create({
   unlockText: {
     flex: 1,
     fontFamily: fonts.serifBold,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 13,
   },
   unlockBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: colors.gold,
+    backgroundColor: c.gold,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 999,

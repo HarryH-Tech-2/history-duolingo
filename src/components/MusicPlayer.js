@@ -4,7 +4,7 @@
 // Tracks are registered in src/data/audioTracks.js.
 
 import { useEffect } from 'react';
-import { useAudioPlayer } from 'expo-audio';
+import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { useUser } from '../state/UserContext';
 
 export default function MusicPlayer() {
@@ -12,6 +12,18 @@ export default function MusicPlayer() {
 
   const track = audioTracks.find((t) => t.id === settings.musicTrackId);
   const shouldPlay = settings.music && !!track && !!track.source;
+
+  // Configure the audio session once so playback survives the iOS silent
+  // switch and Android interruptions. Without this, picking a track from
+  // the music sheet appears to do nothing on devices in silent mode.
+  useEffect(() => {
+    setAudioModeAsync({
+      playsInSilentMode: true,
+      shouldPlayInBackground: false,
+      interruptionMode: 'mixWithOthers',
+      interruptionModeAndroid: 'duckOthers',
+    }).catch((e) => console.warn('MusicPlayer: setAudioModeAsync failed', e));
+  }, []);
 
   const player = useAudioPlayer(shouldPlay ? track.source : null);
 

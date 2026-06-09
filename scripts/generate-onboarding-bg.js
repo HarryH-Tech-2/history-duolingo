@@ -1,9 +1,13 @@
 // Generates an onboarding background image via Gemini 2.5 Flash Image (nano-banana).
-// Usage: node scripts/generate-onboarding-bg.js
+// Usage: GEMINI_API_KEY=... node scripts/generate-onboarding-bg.js
 const fs = require('fs');
 const path = require('path');
 
-const API_KEY = process.env.GEMINI_API_KEY || 'AIzaSyCNDEhUkgQ6TW6kD2AujQxLIPfeSPnFAas';
+const API_KEY = process.env.GEMINI_API_KEY;
+if (!API_KEY) {
+  console.error('Set GEMINI_API_KEY in your environment before running this script.');
+  process.exit(1);
+}
 const MODEL = 'gemini-2.5-flash-image';
 const URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${API_KEY}`;
 

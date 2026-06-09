@@ -4,14 +4,16 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors, fonts, radii } from '../theme';
+import { fonts, radii } from '../theme';
 import { MODULES } from '../data/curriculum';
-import { useUser } from '../state/UserContext';
+import { useUser, useThemeColors } from '../state/UserContext';
 import ProgressRing from '../components/ProgressRing';
 
 export default function LearnScreen({ navigation }) {
   // Subscribe so progress recomputes on lesson completion.
   const { version } = useUser();
+  const c = useThemeColors();
+  const styles = React.useMemo(() => makeStyles(c), [c]);
 
   // Build live "units" from MODULES using current lesson statuses.
   const units = React.useMemo(
@@ -34,7 +36,7 @@ export default function LearnScreen({ navigation }) {
   return (
     <View style={styles.root}>
       <LinearGradient
-        colors={['#0A1024', '#0B0F1C']}
+        colors={[c.gradient[0], c.bg]}
         style={StyleSheet.absoluteFill}
       />
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
@@ -51,7 +53,14 @@ export default function LearnScreen({ navigation }) {
           contentContainerStyle={{ paddingBottom: 140 }}
         >
           {units.map((unit, i) => (
-            <UnitBlock key={unit.id} unit={unit} index={i} navigation={navigation} />
+            <UnitBlock
+              key={unit.id}
+              unit={unit}
+              index={i}
+              navigation={navigation}
+              c={c}
+              styles={styles}
+            />
           ))}
         </ScrollView>
       </SafeAreaView>
@@ -59,7 +68,7 @@ export default function LearnScreen({ navigation }) {
   );
 }
 
-function UnitBlock({ unit, index, navigation }) {
+function UnitBlock({ unit, index, navigation, c, styles }) {
   const isLocked = unit.progress === 0 && index > 0;
   return (
     <View style={{ marginHorizontal: 16, marginBottom: 24 }}>
@@ -82,7 +91,7 @@ function UnitBlock({ unit, index, navigation }) {
 
       {unit.lessons.length === 0 ? (
         <View style={styles.emptyLessons}>
-          <Ionicons name="lock-closed" size={18} color={colors.textMuted} />
+          <Ionicons name="lock-closed" size={18} color={c.textMuted} />
           <Text style={styles.emptyText}>
             Complete the previous era to unlock these lessons.
           </Text>
@@ -119,7 +128,7 @@ function UnitBlock({ unit, index, navigation }) {
                 ) : lesson.status === 'active' ? (
                   <Ionicons name="play" size={14} color="#0B0F1C" />
                 ) : (
-                  <Ionicons name="lock-closed" size={14} color={colors.textMuted} />
+                  <Ionicons name="lock-closed" size={14} color={c.textMuted} />
                 )}
               </View>
               <View style={{ flex: 1 }}>
@@ -151,7 +160,7 @@ function UnitBlock({ unit, index, navigation }) {
                 name="chevron-forward"
                 size={18}
                 color={
-                  lesson.status === 'locked' ? colors.textLocked : colors.textSecondary
+                  lesson.status === 'locked' ? c.textLocked : c.textSecondary
                 }
                 style={{ marginLeft: 8 }}
               />
@@ -163,26 +172,26 @@ function UnitBlock({ unit, index, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
+const makeStyles = (c) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: c.bg },
   header: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16 },
   eyebrow: {
     fontFamily: fonts.serifBold,
-    color: colors.gold,
+    color: c.gold,
     fontSize: 11,
     letterSpacing: 2.5,
     marginBottom: 4,
   },
   title: {
     fontFamily: fonts.heading,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 36,
     lineHeight: 40,
     letterSpacing: -0.5,
   },
   sub: {
     fontFamily: fonts.serifItalic,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     fontSize: 14,
     marginTop: 6,
   },
@@ -193,18 +202,18 @@ const styles = StyleSheet.create({
   },
   unitEyebrow: {
     fontFamily: fonts.serifBold,
-    color: colors.textMuted,
+    color: c.textMuted,
     fontSize: 10,
     letterSpacing: 1.8,
     marginBottom: 2,
   },
   unitTitle: {
     fontFamily: fonts.heading,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 22,
     lineHeight: 26,
   },
-  locked: { color: colors.textLocked },
+  locked: { color: c.textLocked },
   ringWrap: { alignItems: 'center', justifyContent: 'center' },
   ringText: {
     position: 'absolute',
@@ -214,9 +223,9 @@ const styles = StyleSheet.create({
   lessonRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.bgCard,
+    backgroundColor: c.bgCard,
     borderWidth: 1,
-    borderColor: colors.borderSubtle,
+    borderColor: c.borderSubtle,
     borderRadius: radii.md,
     padding: 14,
     marginBottom: 8,
@@ -231,12 +240,12 @@ const styles = StyleSheet.create({
   },
   lessonTitle: {
     fontFamily: fonts.heading,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 16,
   },
   lessonSub: {
     fontFamily: fonts.serif,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     fontSize: 12,
     marginTop: 2,
   },
@@ -246,11 +255,11 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: 'rgba(138, 107, 199, 0.2)',
     borderWidth: 1,
-    borderColor: colors.royal,
+    borderColor: c.royal,
   },
   progressChipText: {
     fontFamily: fonts.serifBold,
-    color: colors.royal,
+    color: c.royal,
     fontSize: 11,
   },
   emptyLessons: {
@@ -259,14 +268,14 @@ const styles = StyleSheet.create({
     gap: 10,
     padding: 16,
     borderRadius: radii.md,
-    backgroundColor: 'rgba(245, 232, 208, 0.03)',
+    backgroundColor: c.bgGlass,
     borderWidth: 1,
-    borderColor: colors.borderSubtle,
+    borderColor: c.borderSubtle,
     borderStyle: 'dashed',
   },
   emptyText: {
     fontFamily: fonts.serifItalic,
-    color: colors.textMuted,
+    color: c.textMuted,
     fontSize: 13,
     flex: 1,
   },

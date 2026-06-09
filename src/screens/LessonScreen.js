@@ -9,45 +9,91 @@ import {
   Dimensions,
   Image,
   ScrollView,
+  Linking,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import { useAudioPlayer } from 'expo-audio';
 
-import { colors, fonts, radii, spacing } from '../theme';
+import { fonts, radii, spacing } from '../theme';
+
+const correctSfx = require('../../assets/correct-answer-sound.mp3');
+const wrongSfx = require('../../assets/wrong-answer-sound.mp3');
+const founderPhoto = require('../../assets/founder-harry.png');
+
+// TODO: replace with the real store URLs once History Hero is published.
+// iOS: itms-apps://apps.apple.com/app/id<APP_ID>?action=write-review
+// Android: market://details?id=com.historyhero.app
+const REVIEW_URL_IOS = 'itms-apps://apps.apple.com/app/id0000000000?action=write-review';
+const REVIEW_URL_ANDROID = 'market://details?id=com.historyhero.app';
+const REVIEW_URL_WEB_FALLBACK = 'https://play.google.com/store/apps/details?id=com.historyhero.app';
+const FEEDBACK_EMAIL = 'feedback@historyhero.app';
 import { UNITS } from '../data/curriculum';
 import { Heart } from '../components/Stats';
 import Owl from '../components/Owl';
-import { useUser } from '../state/UserContext';
+import { useUser, useThemeColors } from '../state/UserContext';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
 const QUESTIONS_PER_LESSON = 8;
 const STARTING_HEARTS = 3;
 
+function useThemed() {
+  const c = useThemeColors();
+  const styles = useMemo(() => makeStyles(c), [c]);
+  return { c, styles };
+}
+
 export default function LessonScreen({ route, navigation }) {
   const { recordAnswer, completeLesson, settings } = useUser();
+  const { c, styles } = useThemed();
+  const insets = useSafeAreaInsets();
   const { lessonId } = route.params || {};
   const lesson = useMemo(() => {
     for (const u of UNITS) {
       const l = u.lessons.find((x) => x.id === lessonId);
       if (l) return l;
     }
-    // fallback to first lesson with questions
     return UNITS[0].lessons.find((l) => l.questions && l.questions.length > 0);
   }, [lessonId]);
 
-  // Build the session question list: cycle through the lesson's question
-  // pool until we have QUESTIONS_PER_LESSON questions for this run.
   const sessionQuestions = useMemo(() => {
     const pool = lesson?.questions || [];
     if (pool.length === 0) return [];
+    // Shuffle the pool so each session feels fresh.
+    const shuffle = (arr) => {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    };
+    const shuffled = shuffle(pool);
     const out = [];
-    for (let i = 0; i < QUESTIONS_PER_LESSON; i++) {
-      out.push(pool[i % pool.length]);
+    let i = 0;
+    while (out.length < QUESTIONS_PER_LESSON) {
+      // Reshuffle when cycling so back-to-back repeats are less likely.
+      if (i > 0 && i % shuffled.length === 0) {
+        const next = shuffle(pool);
+        // Avoid placing the same question twice in a row when wrapping.
+        if (next[0] === out[out.length - 1] && next.length > 1) {
+          [next[0], next[1]] = [next[1], next[0]];
+        }
+        for (const q of next) {
+          if (out.length >= QUESTIONS_PER_LESSON) break;
+          out.push(q);
+        }
+        i = out.length;
+      } else {
+        out.push(shuffled[i % shuffled.length]);
+        i++;
+      }
     }
-    return out;
+    return out.slice(0, QUESTIONS_PER_LESSON);
   }, [lesson]);
 
   const [qIndex, setQIndex] = useState(0);
@@ -56,6 +102,11 @@ export default function LessonScreen({ route, navigation }) {
   const [hearts, setHearts] = useState(STARTING_HEARTS);
   const [correctCount, setCorrectCount] = useState(0);
   const [finished, setFinished] = useState(false);
+
+  // Pre-loaded answer SFX. expo-audio keeps the buffer hot so the cue fires
+  // the instant the player taps CHECK rather than after a load delay.
+  const correctPlayer = useAudioPlayer(correctSfx);
+  const wrongPlayer = useAudioPlayer(wrongSfx);
 
   const total = sessionQuestions.length;
   const progress = total ? (qIndex + (checked ? 1 : 0)) / total : 0;
@@ -70,10 +121,20 @@ export default function LessonScreen({ route, navigation }) {
     }).start();
   }, [progress]);
 
+  // Out of lives: bounce back to the map after a short pause so the
+  // player can see the heart hit zero.
+  useEffect(() => {
+    if (hearts > 0 || finished) return;
+    const t = setTimeout(() => {
+      navigation.goBack();
+    }, 900);
+    return () => clearTimeout(t);
+  }, [hearts, finished, navigation]);
+
   if (!lesson || sessionQuestions.length === 0) {
     return (
       <View style={[styles.root, { alignItems: 'center', justifyContent: 'center' }]}>
-        <LinearGradient colors={['#0A1024', '#0B0F1C']} style={StyleSheet.absoluteFill} />
+        <LinearGradient colors={[c.gradient[0], c.bg]} style={StyleSheet.absoluteFill} />
         <Text style={styles.bigTitle}>This lesson is locked.</Text>
         <Pressable style={styles.primaryBtn} onPress={() => navigation.goBack()}>
           <Text style={styles.primaryBtnText}>Return to map</Text>
@@ -109,10 +170,26 @@ export default function LessonScreen({ route, navigation }) {
       if (settings?.haptics) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       }
+      if (settings?.soundEffects) {
+        try {
+          correctPlayer.seekTo(0);
+          correctPlayer.play();
+        } catch (e) {
+          // SFX failures should never block answer flow.
+        }
+      }
     } else {
       setHearts((h) => Math.max(0, h - 1));
       if (settings?.haptics) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+      }
+      if (settings?.soundEffects) {
+        try {
+          wrongPlayer.seekTo(0);
+          wrongPlayer.play();
+        } catch (e) {
+          // SFX failures should never block answer flow.
+        }
       }
     }
   };
@@ -130,7 +207,7 @@ export default function LessonScreen({ route, navigation }) {
   return (
     <View style={styles.root}>
       <LinearGradient
-        colors={['#0A1024', '#131827', '#0B0F1C']}
+        colors={c.gradient}
         style={StyleSheet.absoluteFill}
       />
 
@@ -142,7 +219,7 @@ export default function LessonScreen({ route, navigation }) {
             onPress={() => navigation.goBack()}
             style={styles.closeBtn}
           >
-            <Ionicons name="close" size={24} color={colors.textSecondary} />
+            <Ionicons name="close" size={24} color={c.textSecondary} />
           </Pressable>
           <View style={styles.progressTrack}>
             <Animated.View
@@ -249,19 +326,25 @@ export default function LessonScreen({ route, navigation }) {
         </ScrollView>
 
         {/* Footer: check / continue */}
-        <View style={[styles.footer, checked && (isCorrect ? styles.footerCorrect : styles.footerWrong)]}>
+        <View
+          style={[
+            styles.footer,
+            { paddingBottom: 20 + Math.max(insets.bottom, 8) },
+            checked && (isCorrect ? styles.footerCorrect : styles.footerWrong),
+          ]}
+        >
           {checked && (
             <View style={styles.feedbackRow}>
               <View style={styles.feedbackHeader}>
                 <Ionicons
                   name={isCorrect ? 'checkmark-circle' : 'close-circle'}
                   size={22}
-                  color={isCorrect ? colors.emerald : colors.crimson}
+                  color={isCorrect ? c.emerald : c.crimson}
                 />
                 <Text
                   style={[
                     styles.feedbackTitle,
-                    { color: isCorrect ? colors.emerald : colors.crimson },
+                    { color: isCorrect ? c.emerald : c.crimson },
                   ]}
                 >
                   {isCorrect ? 'Magnificent!' : 'Not quite.'}
@@ -284,7 +367,7 @@ export default function LessonScreen({ route, navigation }) {
               <Text
                 style={[
                   styles.primaryBtnText,
-                  selected === null && { color: 'rgba(245, 232, 208, 0.35)' },
+                  selected === null && { color: c.textLocked },
                 ]}
               >
                 CHECK
@@ -324,6 +407,7 @@ function getTFState({ val, selected, checked, correct }) {
 }
 
 function AnswerOption({ index, label, state, disabled, onPress }) {
+  const { styles } = useThemed();
   const prefix = String.fromCharCode(65 + index);
   const styleMap = {
     idle: styles.answerIdle,
@@ -356,6 +440,7 @@ function AnswerOption({ index, label, state, disabled, onPress }) {
 }
 
 function AnswerTF({ label, state, disabled, onPress }) {
+  const { styles } = useThemed();
   const styleMap = {
     idle: styles.answerIdle,
     selected: styles.answerSelected,
@@ -378,16 +463,28 @@ function AnswerTF({ label, state, disabled, onPress }) {
 }
 
 function CompletionScreen({ lesson, correctCount, total, onDone }) {
+  const { c, styles } = useThemed();
+  const { settings, updateSetting } = useUser();
   const xp = correctCount * 10;
   const percent = Math.round((correctCount / total) * 100);
+
+  // Session-only dismissal so "Maybe later" hides the card until the next
+  // app launch, without permanently silencing the prompt.
+  const [dismissedThisSession, setDismissedThisSession] = useState(false);
+  const showReview = !settings?.hasReviewed && !dismissedThisSession;
+
   return (
     <View style={styles.root}>
       <LinearGradient
-        colors={['#0A1024', '#1A2A3A', '#0B0F1C']}
+        colors={c.gradient}
         style={StyleSheet.absoluteFill}
       />
       <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1 }}>
-        <View style={styles.completion}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={styles.completion}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={{ marginVertical: 24 }}>
             <Owl size={180} />
           </View>
@@ -395,10 +492,17 @@ function CompletionScreen({ lesson, correctCount, total, onDone }) {
           <Text style={styles.completionTitle}>{lesson.title}</Text>
 
           <View style={styles.completionStats}>
-            <StatBlock label="XP" value={xp} tint={colors.gold} />
-            <StatBlock label="Accuracy" value={`${percent}%`} tint={colors.emerald} />
-            <StatBlock label="Correct" value={`${correctCount}/${total}`} tint={colors.royal} />
+            <StatBlock label="XP" value={xp} tint={c.gold} />
+            <StatBlock label="Accuracy" value={`${percent}%`} tint={c.emerald} />
+            <StatBlock label="Correct" value={`${correctCount}/${total}`} tint={c.royal} />
           </View>
+
+          {showReview && (
+            <ReviewPrompt
+              onReviewed={() => updateSetting('hasReviewed', true)}
+              onDismiss={() => setDismissedThisSession(true)}
+            />
+          )}
 
           <Text style={styles.completionQuote}>
             "The past is never dead. It's not even past." — Faulkner
@@ -410,9 +514,10 @@ function CompletionScreen({ lesson, correctCount, total, onDone }) {
               styles.primaryBtn,
               {
                 marginTop: 20,
-                backgroundColor: colors.gold,
+                backgroundColor: c.gold,
                 paddingVertical: 20,
                 paddingHorizontal: 32,
+                alignSelf: 'stretch',
               },
               pressed && { transform: [{ scale: 0.98 }] },
             ]}
@@ -421,13 +526,102 @@ function CompletionScreen({ lesson, correctCount, total, onDone }) {
               CONTINUE
             </Text>
           </Pressable>
-        </View>
+        </ScrollView>
       </SafeAreaView>
     </View>
   );
 }
 
+// Friendly, founder-fronted review nudge. Shown on the completion screen until
+// the user taps "Leave a review" (persisted) or "Maybe later" (session only).
+// Feedback is intentionally surfaced alongside the review CTA so unhappy users
+// have a low-friction path that doesn't go through the public stores.
+function ReviewPrompt({ onReviewed, onDismiss }) {
+  const { c, styles } = useThemed();
+
+  const openReview = async () => {
+    const primary = Platform.OS === 'ios' ? REVIEW_URL_IOS : REVIEW_URL_ANDROID;
+    try {
+      const supported = await Linking.canOpenURL(primary);
+      if (supported) {
+        await Linking.openURL(primary);
+      } else {
+        await Linking.openURL(REVIEW_URL_WEB_FALLBACK);
+      }
+    } catch (e) {
+      // Last-ditch: try the web fallback so the tap is never a dead end.
+      try {
+        await Linking.openURL(REVIEW_URL_WEB_FALLBACK);
+      } catch {}
+    } finally {
+      onReviewed && onReviewed();
+    }
+  };
+
+  const sendFeedback = async () => {
+    const subject = encodeURIComponent('History Hero — feedback');
+    const body = encodeURIComponent(
+      "Hey Harry,\n\nHere's what I think of History Hero so far:\n\n"
+    );
+    const url = `mailto:${FEEDBACK_EMAIL}?subject=${subject}&body=${body}`;
+    try {
+      await Linking.openURL(url);
+    } catch {}
+  };
+
+  return (
+    <View style={styles.reviewCard}>
+      <View style={styles.reviewTopRow}>
+        <Image source={founderPhoto} style={styles.reviewPhoto} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.reviewEyebrow}>A NOTE FROM HARRY</Text>
+          <Text style={styles.reviewTitle}>Enjoying History Hero?</Text>
+        </View>
+      </View>
+
+      <Text style={styles.reviewBody}>
+        I built this app on my own and every rating helps it reach more curious
+        minds. If you've got a minute, a quick review would mean the world — and
+        if something isn't working for you, tell me directly and I'll fix it.
+      </Text>
+
+      <View style={styles.reviewStarsRow}>
+        {[0, 1, 2, 3, 4].map((i) => (
+          <Ionicons key={i} name="star" size={20} color={c.gold} />
+        ))}
+      </View>
+
+      <Pressable
+        onPress={openReview}
+        style={({ pressed }) => [
+          styles.reviewPrimaryBtn,
+          pressed && { transform: [{ scale: 0.98 }] },
+        ]}
+      >
+        <Ionicons name="star" size={16} color="#0B0F1C" />
+        <Text style={styles.reviewPrimaryText}>LEAVE A REVIEW</Text>
+      </Pressable>
+
+      <Pressable
+        onPress={sendFeedback}
+        style={({ pressed }) => [
+          styles.reviewSecondaryBtn,
+          pressed && { transform: [{ scale: 0.98 }] },
+        ]}
+      >
+        <Ionicons name="mail-outline" size={16} color={c.textPrimary} />
+        <Text style={styles.reviewSecondaryText}>SEND FEEDBACK</Text>
+      </Pressable>
+
+      <Pressable onPress={onDismiss} hitSlop={8}>
+        <Text style={styles.reviewDismiss}>Maybe later</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 function StatBlock({ label, value, tint }) {
+  const { styles } = useThemed();
   return (
     <View style={styles.statBlock}>
       <Text style={[styles.statValue, { color: tint }]}>{value}</Text>
@@ -436,10 +630,10 @@ function StatBlock({ label, value, tint }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: colors.bg,
+    backgroundColor: c.bg,
   },
   header: {
     flexDirection: 'row',
@@ -455,10 +649,10 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 12,
     borderRadius: 6,
-    backgroundColor: 'rgba(232, 201, 116, 0.12)',
+    backgroundColor: c.goldSoft,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: colors.borderSubtle,
+    borderColor: c.borderSubtle,
   },
   progressFill: {
     height: '100%',
@@ -472,7 +666,7 @@ const styles = StyleSheet.create({
   },
   heartCount: {
     fontFamily: fonts.serifBold,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 16,
     marginLeft: 4,
   },
@@ -488,8 +682,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: 18,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.bgCardSolid,
+    borderColor: c.border,
+    backgroundColor: c.bgCardSolid,
   },
   qImage: {
     width: '100%',
@@ -497,14 +691,14 @@ const styles = StyleSheet.create({
   },
   kicker: {
     fontFamily: fonts.serifBold,
-    color: colors.gold,
+    color: c.gold,
     fontSize: 11,
     letterSpacing: 2.5,
     marginBottom: 14,
   },
   question: {
     fontFamily: fonts.heading,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 22,
     lineHeight: 28,
     letterSpacing: -0.2,
@@ -524,20 +718,20 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   answerIdle: {
-    backgroundColor: colors.bgCardSolid,
-    borderColor: colors.borderSubtle,
+    backgroundColor: c.bgCardSolid,
+    borderColor: c.borderSubtle,
   },
   answerSelected: {
-    backgroundColor: 'rgba(232, 201, 116, 0.12)',
-    borderColor: colors.gold,
+    backgroundColor: c.goldSoft,
+    borderColor: c.gold,
   },
   answerCorrect: {
     backgroundColor: 'rgba(95, 179, 122, 0.18)',
-    borderColor: colors.emerald,
+    borderColor: c.emerald,
   },
   answerWrong: {
     backgroundColor: 'rgba(216, 84, 102, 0.18)',
-    borderColor: colors.crimson,
+    borderColor: c.crimson,
   },
   prefixBubble: {
     width: 36,
@@ -548,30 +742,30 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   prefixIdle: {
-    borderColor: colors.borderSubtle,
-    backgroundColor: 'rgba(245, 232, 208, 0.05)',
+    borderColor: c.borderSubtle,
+    backgroundColor: c.bgGlass,
   },
   prefixSelected: {
-    borderColor: colors.gold,
-    backgroundColor: 'rgba(232, 201, 116, 0.18)',
+    borderColor: c.gold,
+    backgroundColor: c.goldSoft,
   },
   prefixCorrect: {
-    borderColor: colors.emerald,
+    borderColor: c.emerald,
     backgroundColor: 'rgba(95, 179, 122, 0.25)',
   },
   prefixWrong: {
-    borderColor: colors.crimson,
+    borderColor: c.crimson,
     backgroundColor: 'rgba(216, 84, 102, 0.25)',
   },
   prefixText: {
     fontFamily: fonts.serifBold,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 14,
   },
   answerText: {
     flex: 1,
     fontFamily: fonts.serif,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 17,
     lineHeight: 22,
   },
@@ -590,22 +784,22 @@ const styles = StyleSheet.create({
   },
   tfText: {
     fontFamily: fonts.heading,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 22,
   },
   footer: {
     padding: 20,
     borderTopWidth: 1,
-    borderColor: colors.borderSubtle,
-    backgroundColor: 'rgba(11, 15, 28, 0.8)',
+    borderColor: c.borderSubtle,
+    backgroundColor: c.overlay,
   },
   footerCorrect: {
     backgroundColor: 'rgba(95, 179, 122, 0.08)',
-    borderTopColor: colors.emerald,
+    borderTopColor: c.emerald,
   },
   footerWrong: {
     backgroundColor: 'rgba(216, 84, 102, 0.08)',
-    borderTopColor: colors.crimson,
+    borderTopColor: c.crimson,
   },
   feedbackRow: {
     marginBottom: 14,
@@ -622,21 +816,21 @@ const styles = StyleSheet.create({
   },
   feedbackFact: {
     fontFamily: fonts.serifItalic,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     fontSize: 14,
     lineHeight: 20,
   },
   primaryBtn: {
     paddingVertical: 16,
     borderRadius: radii.md,
-    backgroundColor: colors.gold,
+    backgroundColor: c.gold,
     alignItems: 'center',
     justifyContent: 'center',
   },
   primaryBtnDisabled: {
-    backgroundColor: 'rgba(245, 232, 208, 0.08)',
+    backgroundColor: c.bgGlass,
     borderWidth: 1,
-    borderColor: colors.borderSubtle,
+    borderColor: c.borderSubtle,
   },
   primaryBtnText: {
     fontFamily: fonts.serifBold,
@@ -645,33 +839,122 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
   },
   btnGreen: {
-    backgroundColor: colors.emerald,
+    backgroundColor: c.emerald,
   },
   btnRed: {
-    backgroundColor: colors.crimson,
+    backgroundColor: c.crimson,
   },
   bigTitle: {
     fontFamily: fonts.heading,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 28,
     marginBottom: 20,
   },
   completion: {
-    flex: 1,
+    flexGrow: 1,
     alignItems: 'center',
     paddingHorizontal: 24,
+    paddingBottom: 32,
     justifyContent: 'center',
+  },
+  reviewCard: {
+    width: '100%',
+    backgroundColor: c.bgCard,
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: radii.lg,
+    padding: 18,
+    marginBottom: 18,
+    alignItems: 'stretch',
+    gap: 12,
+  },
+  reviewTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  reviewPhoto: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 2,
+    borderColor: c.gold,
+    backgroundColor: c.bgCardSolid,
+  },
+  reviewEyebrow: {
+    fontFamily: fonts.serifBold,
+    color: c.gold,
+    fontSize: 10,
+    letterSpacing: 2.2,
+    marginBottom: 4,
+  },
+  reviewTitle: {
+    fontFamily: fonts.heading,
+    color: c.textPrimary,
+    fontSize: 19,
+    lineHeight: 22,
+  },
+  reviewBody: {
+    fontFamily: fonts.serif,
+    color: c.textSecondary,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  reviewStarsRow: {
+    flexDirection: 'row',
+    gap: 4,
+    justifyContent: 'center',
+    paddingVertical: 2,
+  },
+  reviewPrimaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: c.gold,
+    paddingVertical: 14,
+    borderRadius: radii.md,
+  },
+  reviewPrimaryText: {
+    fontFamily: fonts.serifBold,
+    color: '#0B0F1C',
+    fontSize: 14,
+    letterSpacing: 1.6,
+  },
+  reviewSecondaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: c.bgGlass,
+    borderWidth: 1,
+    borderColor: c.borderSubtle,
+    paddingVertical: 12,
+    borderRadius: radii.md,
+  },
+  reviewSecondaryText: {
+    fontFamily: fonts.serifBold,
+    color: c.textPrimary,
+    fontSize: 13,
+    letterSpacing: 1.4,
+  },
+  reviewDismiss: {
+    fontFamily: fonts.serifItalic,
+    color: c.textMuted,
+    fontSize: 12,
+    textAlign: 'center',
+    paddingVertical: 4,
   },
   completionEyebrow: {
     fontFamily: fonts.serifBold,
-    color: colors.gold,
+    color: c.gold,
     fontSize: 12,
     letterSpacing: 3,
     marginBottom: 8,
   },
   completionTitle: {
     fontFamily: fonts.heading,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 32,
     lineHeight: 36,
     textAlign: 'center',
@@ -686,9 +969,9 @@ const styles = StyleSheet.create({
   },
   statBlock: {
     flex: 1,
-    backgroundColor: colors.bgCard,
+    backgroundColor: c.bgCard,
     borderWidth: 1,
-    borderColor: colors.borderSubtle,
+    borderColor: c.borderSubtle,
     borderRadius: radii.md,
     paddingVertical: 16,
     alignItems: 'center',
@@ -700,13 +983,13 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontFamily: fonts.serif,
-    color: colors.textMuted,
+    color: c.textMuted,
     fontSize: 11,
     letterSpacing: 1.2,
   },
   completionQuote: {
     fontFamily: fonts.serifItalic,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     fontSize: 15,
     textAlign: 'center',
     lineHeight: 22,

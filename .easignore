@@ -20,7 +20,11 @@ web-build/
 # --- Additional EAS-only exclusions ---
 
 # Git history is huge and never needed by the build server.
-.git/
+# IMPORTANT: must be ".git" (no trailing slash) — eas-cli's `.git` removal
+# checks `ignore.ignores('.git')` which the `ignore` lib treats as the
+# bare path; the trailing-slash form ".git/" does NOT match it. With
+# ".git/" the entire shallow clone (200+ MB on this repo) gets uploaded.
+.git
 .gitignore
 .gitattributes
 

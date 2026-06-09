@@ -4,9 +4,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors, fonts, radii } from '../theme';
+import { fonts, radii } from '../theme';
 import { QUESTS } from '../data/curriculum';
 import { Gem } from '../components/Stats';
+import { useThemeColors } from '../state/UserContext';
 
 const ICONS = {
   scroll: 'document-text',
@@ -22,7 +23,7 @@ const ICONS = {
   person: 'person',
 };
 
-function QuestCard({ q }) {
+function QuestCard({ q, c, styles }) {
   const pct = Math.min(1, q.progress / q.total);
   const done = q.progress >= q.total;
   return (
@@ -30,13 +31,13 @@ function QuestCard({ q }) {
       <View
         style={[
           styles.questIcon,
-          { backgroundColor: done ? colors.emerald : colors.goldSoft },
+          { backgroundColor: done ? c.emerald : c.goldSoft },
         ]}
       >
         <Ionicons
           name={ICONS[q.icon] || 'trophy'}
           size={22}
-          color={done ? '#fff' : colors.gold}
+          color={done ? '#fff' : c.gold}
         />
       </View>
       <View style={{ flex: 1 }}>
@@ -47,7 +48,7 @@ function QuestCard({ q }) {
               styles.barFill,
               {
                 width: `${pct * 100}%`,
-                backgroundColor: done ? colors.emerald : colors.gold,
+                backgroundColor: done ? c.emerald : c.gold,
               },
             ]}
           />
@@ -65,11 +66,13 @@ function QuestCard({ q }) {
 }
 
 export default function QuestsScreen() {
+  const c = useThemeColors();
+  const styles = React.useMemo(() => makeStyles(c), [c]);
   const daily = QUESTS.filter((q) => (q.group || 'daily') === 'daily');
   const weekly = QUESTS.filter((q) => q.group === 'weekly');
   return (
     <View style={styles.root}>
-      <LinearGradient colors={['#0A1024', '#0B0F1C']} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={[c.gradient[0], c.bg]} style={StyleSheet.absoluteFill} />
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
         <View style={styles.header}>
           <Text style={styles.eyebrow}>QUESTS</Text>
@@ -84,18 +87,18 @@ export default function QuestsScreen() {
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 140 }}
         >
           <Text style={styles.groupLabel}>DAILY</Text>
-          {daily.map((q) => <QuestCard key={q.id} q={q} />)}
+          {daily.map((q) => <QuestCard key={q.id} q={q} c={c} styles={styles} />)}
 
           {weekly.length > 0 && (
             <>
               <Text style={[styles.groupLabel, { marginTop: 18 }]}>WEEKLY</Text>
-              {weekly.map((q) => <QuestCard key={q.id} q={q} />)}
+              {weekly.map((q) => <QuestCard key={q.id} q={q} c={c} styles={styles} />)}
             </>
           )}
 
           <View style={styles.chest}>
             <View style={styles.chestIcon}>
-              <Ionicons name="gift" size={28} color={colors.gold} />
+              <Ionicons name="gift" size={28} color={c.gold} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.chestTitle}>Legendary Chest</Text>
@@ -110,32 +113,32 @@ export default function QuestsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
+const makeStyles = (c) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: c.bg },
   header: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16 },
   eyebrow: {
     fontFamily: fonts.serifBold,
-    color: colors.gold,
+    color: c.gold,
     fontSize: 11,
     letterSpacing: 2.5,
     marginBottom: 4,
   },
   title: {
     fontFamily: fonts.heading,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 36,
     lineHeight: 40,
     letterSpacing: -0.5,
   },
   sub: {
     fontFamily: fonts.serifItalic,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     fontSize: 14,
     marginTop: 6,
   },
   groupLabel: {
     fontFamily: fonts.serifBold,
-    color: colors.gold,
+    color: c.gold,
     fontSize: 11,
     letterSpacing: 2.5,
     marginBottom: 10,
@@ -146,14 +149,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 14,
     gap: 14,
-    backgroundColor: colors.bgCard,
+    backgroundColor: c.bgCard,
     borderWidth: 1,
-    borderColor: colors.borderSubtle,
+    borderColor: c.borderSubtle,
     borderRadius: radii.md,
     marginBottom: 10,
   },
   questDone: {
-    borderColor: colors.emerald,
+    borderColor: c.emerald,
     backgroundColor: 'rgba(95, 179, 122, 0.08)',
   },
   questIcon: {
@@ -165,20 +168,20 @@ const styles = StyleSheet.create({
   },
   questTitle: {
     fontFamily: fonts.heading,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 16,
     marginBottom: 8,
   },
   barTrack: {
     height: 8,
     borderRadius: 4,
-    backgroundColor: 'rgba(232, 201, 116, 0.12)',
+    backgroundColor: c.goldSoft,
     overflow: 'hidden',
   },
   barFill: { height: '100%', borderRadius: 4 },
   questProgress: {
     fontFamily: fonts.serif,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     fontSize: 12,
     marginTop: 4,
   },
@@ -189,7 +192,7 @@ const styles = StyleSheet.create({
   },
   rewardText: {
     fontFamily: fonts.serifBold,
-    color: colors.emerald,
+    color: c.emerald,
     fontSize: 13,
   },
   chest: {
@@ -198,28 +201,28 @@ const styles = StyleSheet.create({
     marginTop: 14,
     padding: 16,
     gap: 14,
-    backgroundColor: 'rgba(232, 201, 116, 0.08)',
+    backgroundColor: c.goldSoft,
     borderRadius: radii.md,
     borderWidth: 1.5,
-    borderColor: colors.gold,
+    borderColor: c.gold,
     borderStyle: 'dashed',
   },
   chestIcon: {
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: 'rgba(232, 201, 116, 0.15)',
+    backgroundColor: c.goldSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
   chestTitle: {
     fontFamily: fonts.heading,
-    color: colors.gold,
+    color: c.gold,
     fontSize: 18,
   },
   chestSub: {
     fontFamily: fonts.serif,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     fontSize: 13,
     marginTop: 2,
   },
