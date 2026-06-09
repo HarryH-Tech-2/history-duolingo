@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "History Hero",
-    "slug": "chronos",
+    "slug": "history-hero",
     "scheme": "historyhero",
     "version": "1.0.0",
     "orientation": "portrait",

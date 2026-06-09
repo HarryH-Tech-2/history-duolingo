@@ -1,4 +1,4 @@
-# Chronos — Duolingo for History
+# History Hero
 
 A gamified history-learning app built with Expo / React Native.
 
@@ -13,7 +13,7 @@ A gamified history-learning app built with Expo / React Native.
 ## Run
 
 ```
-cd history-duolingo
+cd history-hero
 npm install
 npx expo start
 ```

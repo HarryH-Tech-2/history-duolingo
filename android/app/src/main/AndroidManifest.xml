@@ -27,7 +27,7 @@
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="historyhero"/>
-        <data android:scheme="exp+chronos"/>
+        <data android:scheme="exp+history-hero"/>
       </intent-filter>
     </activity>
   </application>
